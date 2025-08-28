@@ -1,0 +1,53 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# vextuClone - comando principal que descarga librerías desde GitHub si no existen
+
+LIB_DIR="$HOME/.vextuClone-lib"
+LIB_NET="$LIB_DIR/network.sh"
+LIB_PARSER="$LIB_DIR/parser.sh"
+
+# Crear carpeta de librerías si no existe
+mkdir -p "$LIB_DIR"
+
+# URLs de tus librerías en GitHub
+URL_NET="https://raw.githubusercontent.com/WM-HTML/VextuClone/refs/heads/main/network.sh"
+URL_PARSER="https://raw.githubusercontent.com/WM-HTML/VextuClone/refs/heads/main/parser.sh"
+
+# Descargar librerías si faltan
+[ ! -f "$LIB_NET" ] && echo "🔽 Descargando librería network.sh..." && curl -s -o "$LIB_NET" "$URL_NET"
+[ ! -f "$LIB_PARSER" ] && echo "🔽 Descargando librería parser.sh..." && curl -s -o "$LIB_PARSER" "$URL_PARSER"
+
+# Verificar si se descargaron
+if [ ! -f "$LIB_NET" ] || [ ! -f "$LIB_PARSER" ]; then
+    echo "❌ No se pudieron descargar las librerías. Revisa tu conexión o URLs."
+    exit 1
+fi
+
+# Cargar librerías
+source "$LIB_NET"
+source "$LIB_PARSER"
+
+URL="$1"
+if [ -z "$URL" ]; then
+    echo "Uso: vextuClone <web>"
+    exit 1
+fi
+
+WEBNAME=$(echo "$URL" | sed -E 's#https?://##; s#[^a-zA-Z0-9]#_#g')
+DEST="/sdcard/Download/VextuClone/$WEBNAME"
+mkdir -p "$DEST"
+
+echo "🌐 Descargando $URL a $DEST..."
+
+# Descargar HTML principal
+download_file "$URL" "$DEST/index.html"
+
+# Descargar CSS, JS, JSON, Imágenes
+for type in css js json img; do
+    func="extract_$type"
+    $func "$DEST/index.html" | while read file; do
+        echo "📄 $type: $file"
+        download_file "$URL/$file" "$DEST/$(basename $file)"
+    done
+done
+
+echo "✅ Descarga completada en $DEST"

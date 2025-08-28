@@ -1,9 +1,14 @@
 #!/bin/bash
-# vextuClone - Termux web cloner
-# Descarga todo el contenido de una web (HTML, CSS, JS, JSON, imágenes)
+# vextuClone - Termux Web Cloner Profesional
+# Autor: Vextu Android
 
-# Requerimientos: curl, grep, sed
-# Librerías internas
+# Banner bonito
+echo "┌─────────────────────────┐"
+echo "│       Vextu Android     │"
+echo "│       vextuClone        │"
+echo "└─────────────────────────┘"
+
+# Crear carpeta de librerías internas
 LIB_DIR="$HOME/.vextuClone-lib"
 mkdir -p "$LIB_DIR"
 
@@ -35,15 +40,49 @@ PORT=80
 DEST="/sdcard/Download/VextuClone/$(echo $HOST | sed 's#/#_#g')"
 mkdir -p "$DEST"
 
-echo "🌐 Descargando $URL a $DEST..."
+echo "🌐 Descargando $URL a $DEST ..."
+
+# Función para descargar con barra de progreso
+download_file() {
+    local URL="$1"
+    local OUT="$2"
+    mkdir -p "$(dirname "$OUT")"
+    # Barra de progreso
+    curl -# -L "$URL" -o "$OUT"
+}
 
 # Descargar HTML principal
-curl -sL "$URL" -o "$DEST/index.html"
+download_file "$URL" "$DEST/index.html"
 
-# Parsear y descargar CSS, JS, JSON e imágenes
-extract_css "$DEST/index.html" "$DEST"
-extract_js "$DEST/index.html" "$DEST"
-extract_json "$DEST/index.html" "$DEST"
-extract_img "$DEST/index.html" "$DEST"
+# Función para descargar recursos
+download_resources() {
+    local HTML="$1"
+    local DEST="$2"
+    local REGEX="$3"
+    local TYPE="$4"
+
+    echo "📦 Descargando $TYPE..."
+    grep -oP "$REGEX" "$HTML" | while read -r path; do
+        [ -z "$path" ] && continue
+
+        # Convertir a URL absoluta
+        if [[ "$path" =~ ^/ ]]; then
+            FULL_URL="$SCHEME://$HOST$path"
+        elif [[ "$path" =~ ^https?:// ]]; then
+            FULL_URL="$path"
+        else
+            FULL_URL="$SCHEME://$HOST/$path"
+        fi
+
+        FILE_PATH="$DEST/$(echo $path | sed 's#^/##')"
+        download_file "$FULL_URL" "$FILE_PATH"
+    done
+}
+
+# Descargar CSS, JS, JSON, imágenes
+download_resources "$DEST/index.html" "$DEST" '(?<=href=")[^"]+\.css' "CSS"
+download_resources "$DEST/index.html" "$DEST" '(?<=src=")[^"]+\.js' "JS"
+download_resources "$DEST/index.html" "$DEST" '(?<=src=")[^"]+\.json' "JSON"
+download_resources "$DEST/index.html" "$DEST" '(?<=src=")[^"]+\.(jpg|jpeg|png|gif|svg)' "IMÁGENES"
 
 echo "✅ Descarga completada en $DEST"

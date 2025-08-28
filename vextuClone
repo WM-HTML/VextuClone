@@ -1,53 +1,49 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# vextuClone - comando principal que descarga librerías desde GitHub si no existen
+#!/bin/bash
+# vextuClone - Termux web cloner
+# Descarga todo el contenido de una web (HTML, CSS, JS, JSON, imágenes)
 
+# Requerimientos: curl, grep, sed
+# Librerías internas
 LIB_DIR="$HOME/.vextuClone-lib"
-LIB_NET="$LIB_DIR/network.sh"
-LIB_PARSER="$LIB_DIR/parser.sh"
-
-# Crear carpeta de librerías si no existe
 mkdir -p "$LIB_DIR"
 
-# URLs de tus librerías en GitHub
-URL_NET="https://raw.githubusercontent.com/WM-HTML/VextuClone/refs/heads/main/network.sh"
-URL_PARSER="https://raw.githubusercontent.com/WM-HTML/VextuClone/refs/heads/main/parser.sh"
+# Descargar librerías si no existen
+[ ! -f "$LIB_DIR/network.sh" ] && \
+curl -sL https://raw.githubusercontent.com/WM-HTML/VextuClone/refs/heads/main/network.sh -o "$LIB_DIR/network.sh"
 
-# Descargar librerías si faltan
-[ ! -f "$LIB_NET" ] && echo "🔽 Descargando librería network.sh..." && curl -s -o "$LIB_NET" "$URL_NET"
-[ ! -f "$LIB_PARSER" ] && echo "🔽 Descargando librería parser.sh..." && curl -s -o "$LIB_PARSER" "$URL_PARSER"
-
-# Verificar si se descargaron
-if [ ! -f "$LIB_NET" ] || [ ! -f "$LIB_PARSER" ]; then
-    echo "❌ No se pudieron descargar las librerías. Revisa tu conexión o URLs."
-    exit 1
-fi
+[ ! -f "$LIB_DIR/parser.sh" ] && \
+curl -sL https://raw.githubusercontent.com/WM-HTML/VextuClone/refs/heads/main/parser.sh -o "$LIB_DIR/parser.sh"
 
 # Cargar librerías
-source "$LIB_NET"
-source "$LIB_PARSER"
+source "$LIB_DIR/network.sh"
+source "$LIB_DIR/parser.sh"
 
+# URL a clonar
 URL="$1"
 if [ -z "$URL" ]; then
-    echo "Uso: vextuClone <web>"
+    echo "🌐 Uso: vextuClone <URL>"
     exit 1
 fi
 
-WEBNAME=$(echo "$URL" | sed -E 's#https?://##; s#[^a-zA-Z0-9]#_#g')
-DEST="/sdcard/Download/VextuClone/$WEBNAME"
+# Limpiar esquema
+HOST=$(echo "$URL" | sed -E 's#https?://##; s#/.*##')
+SCHEME=$(echo "$URL" | sed -E 's#(https?)://.*#\1#')
+PORT=80
+[ "$SCHEME" = "https" ] && PORT=443
+
+# Carpeta de destino
+DEST="/sdcard/Download/VextuClone/$(echo $HOST | sed 's#/#_#g')"
 mkdir -p "$DEST"
 
 echo "🌐 Descargando $URL a $DEST..."
 
 # Descargar HTML principal
-download_file "$URL" "$DEST/index.html"
+curl -sL "$URL" -o "$DEST/index.html"
 
-# Descargar CSS, JS, JSON, Imágenes
-for type in css js json img; do
-    func="extract_$type"
-    $func "$DEST/index.html" | while read file; do
-        echo "📄 $type: $file"
-        download_file "$URL/$file" "$DEST/$(basename $file)"
-    done
-done
+# Parsear y descargar CSS, JS, JSON e imágenes
+extract_css "$DEST/index.html" "$DEST"
+extract_js "$DEST/index.html" "$DEST"
+extract_json "$DEST/index.html" "$DEST"
+extract_img "$DEST/index.html" "$DEST"
 
 echo "✅ Descarga completada en $DEST"
